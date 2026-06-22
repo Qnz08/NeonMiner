@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Neon Miner - Ein Cyberpunk Voxel Tycoon Spiel.">
+    <title>Neon Miner</title>
+    <link rel="icon" href="data:,">
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+</head>
+<body>
+
+<!-- ─── Game Canvas ─────────────────────────────────────────── -->
+<canvas id="game-canvas" title="Klicken um zu spielen"></canvas>
+
+<!-- ─── Crosshair ──────────────────────────────────────────── -->
+<div id="crosshair" aria-hidden="true"></div>
+
+<!-- ─── HUD Top-Left ───────────────────────────────────────── -->
+<div id="hud" aria-label="Spielinformationen" style="display: none;">
+    <div class="hud-pill money-pill">
+        <span class="label">Guthaben</span>
+        <span id="money-display">$0</span>
+    </div>
+    <div class="hud-pill">
+        <span class="label">XYZ</span>
+        <span id="coords">0.0 / 0.0 / 0.0</span>
+    </div>
+    <div class="hud-pill">
+        <span class="label">Modus</span>
+        <span id="mode-display">🚶 Boden</span>
+    </div>
+    <div class="hud-pill">
+        <span class="label">Level</span>
+        <span id="level-display">🎨 Cyan Neon</span>
+    </div>
+    <button id="autoclicker-btn-pc" class="hud-pill auto-pill" title="Autoclicker an/aus (Taste C)" aria-pressed="false" style="pointer-events:auto; cursor:pointer;">
+        <span class="label">Auto (C)</span>
+        <span id="autoclicker-pc-state">AUS</span>
+    </button>
+</div>
+
+<!-- ─── Message Toast ──────────────────────────────────────── -->
+<div id="message" role="status" aria-live="polite"></div>
+
+<!-- ─── Hotbar ─────────────────────────────────────────────── -->
+<div id="hotbar-container" aria-label="Werkzeugleiste">
+    <div id="selected-block-name" aria-live="polite">Gras</div>
+    <div id="hotbar" role="toolbar" aria-label="Block-Auswahl"></div>
+</div>
+
+<!-- ─── Shop Overlay ─────────────────────────────────────────── -->
+<div id="shop-overlay" role="dialog" aria-label="Upgrade Shop" style="display: none;">
+    <div class="shop-card">
+        <h2>🛠 Upgrade Terminal</h2>
+        <div class="money-balance">Dein Guthaben: <span id="shop-money">$0</span></div>
+        <div class="shop-items" id="shop-items-container">
+            <!-- Items injected by JS -->
+        </div>
+        <p class="subtitle">Drücke <b>E</b> oder <b>ESC</b> zum Schließen</p>
+    </div>
+</div>
+
+<!-- ─── Pause / Start Overlay ──────────────────────────────── -->
+<div id="pause-overlay" role="dialog" aria-label="Pausemenü">
+    <div class="game-logo">⛏ NEON MINER</div>
+
+    <button id="play-btn" onclick="startGame()">
+        🎮 Spielen (Survival)
+    </button>
+
+    <div class="pause-card" aria-label="Steuerung">
+        <div class="ctrl-row"><span class="key">W A S D</span> Bewegen</div>
+        <div class="ctrl-row"><span class="key">Maus</span> Umsehen</div>
+        <div class="ctrl-row"><span class="key">Space</span> Springen</div>
+        <div class="ctrl-row"><span class="key">Shift</span> Sprinten</div>
+        <div class="ctrl-row"><span class="key">LMB</span> Gedrückt halten zum Abbauen</div>
+        <div class="ctrl-row"><span class="key">RMB</span> Gerüst platzieren ($5)</div>
+        <div class="ctrl-row"><span class="key">E</span> Upgrade Shop</div>
+        <div class="ctrl-row"><span class="key">F</span> Flugmodus (Freischaltbar)</div>
+        <div class="ctrl-row"><span class="key">Q</span> Dynamit werfen (Freischaltbar)</div>
+        <div class="ctrl-row"><span class="key">ESC</span> Pause / Maus freigeben</div>
+    </div>
+
+    <div style="width:90%;max-width:600px;border-top:1px solid rgba(255,0,127,0.3);padding-top:8px;text-align:center;">
+        <span style="font-family:var(--font-game);font-size:11px;color:rgba(255,0,127,0.6);letter-spacing:2px;">── CREATIVE MODUS ──</span>
+    </div>
+
+    <button id="creative-btn" onclick="startCreativeMode()">
+        🌟 Creative-Modus starten
+    </button>
+
+    <div class="pause-card" aria-label="Sektor-Auswahl (Creative)">
+        <h3 style="margin-bottom: 12px; color: #ff007f;">🚀 SEKTOR-AUSWAHL (Creative)</h3>
+        <div id="sector-selector" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <!-- Sector buttons injected by JS -->
+        </div>
+    </div>
+
+    <div class="pause-card" aria-label="Farbauswahl">
+        <h3 style="margin-bottom: 12px; color: var(--mc-neon);">🎨 FARBAUSWAHL</h3>
+        <div id="level-selector" style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <!-- Color buttons injected by JS -->
+        </div>
+    </div>
+
+    <p class="subtitle">Klicke auf "Spielen" oder den Spielbereich, um die Maus zu sperren</p>
+</div>
+
+<!-- ─── Win Screen ─────────────────────────────────────────── -->
+<div id="win-screen" role="dialog" aria-label="Siegesbildschirm" style="display: none;">
+    <div class="shop-card">
+        <h2 style="font-size: 32px; color: #ff007f;">🚀 HYPER-DRIVE AKTIVIERT</h2>
+        <p style="color: #fff; margin-bottom: 30px; line-height: 1.5;">
+            Du hast es geschafft! Du hast die Mine erfolgreich geplündert und genügend Credits für das Ticket in die Freiheit gesammelt.<br><br>
+            <b>Du hast das Spiel gewonnen!</b>
+        </p>
+        <button class="buy-btn" onclick="location.reload()">NOCHMAL SPIELEN</button>
+    </div>
+</div>
+
+<!-- ─── Loading Screen ─────────────────────────────────────── -->
+<div id="loading-screen" aria-label="Ladebildschirm" aria-live="polite">
+    <div class="loading-logo">⛏ NEON MINER</div>
+    <div class="loading-bar-wrap">
+        <div class="loading-bar-fill"></div>
+    </div>
+    <div id="loading-text">Initialisiere...</div>
+</div>
+
+<!-- ─── Touch Controls Layout ────────────────────────────────── -->
+<div id="touch-controls" class="touch-controls">
+  <!-- Left Side: Left Joystick -->
+  <div class="left-side">
+    <div id="joystick-left" class="joystick-container">
+      <canvas id="joystick-left-bg" class="joystick-bg"></canvas>
+      <div class="joystick-stick"></div>
+    </div>
+  </div>
+
+  <!-- Right Side: Utility Buttons + Right Joystick -->
+  <div class="right-side">
+    <div class="utility-buttons">
+      <button id="mobile-shop-btn" class="side-button shop-touch-btn">&#128717;<br>SHOP</button>
+      <button id="mobile-menu-btn" class="side-button menu-touch-btn">&#128203;<br>MENUE</button>
+      <button id="shoot-btn" class="side-button shoot-btn">&#127919;<br>SHOOT</button>
+      <button id="autoclicker-btn" class="side-button auto-btn">
+        <span class="auto-label">AUTO</span><br><span class="auto-state">OFF</span>
+      </button>
+      <button id="jump-btn" class="side-button jump-btn">&#8593;<br>JUMP</button>
+      <button id="fly-btn" class="side-button fly-btn">&#9992;<br>FLY</button>
+      <button id="dynamite-btn" class="side-button dynamite-btn">&#128163;<br>BOOM</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Game Scripts ────────────────────────────────────────── -->
+<script src="noise.js"></script>
+<script src="sounds.js"></script>
+<script src="blocks.js"></script>
+<script src="world.js"></script>
+<script src="player.js"></script>
+<script src="game.js"></script>
+
+</body>
+</html>
